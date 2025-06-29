@@ -1,83 +1,99 @@
-import express, { Request, Response } from 'express';
+import express from 'express';
 import cors from 'cors';
 
-// Crear aplicación Express
 const app = express();
 const PORT = 8080;
 
-// Middleware
-app.use(express.json());
-app.use(cors());
+// Configurar Express para alto rendimiento
+app.set('trust proxy', false);
+app.set('x-powered-by', false);
 
-// Interfaz para la respuesta
+// Configurar CORS
+app.use(cors({
+  origin: '*',
+  methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
+  allowedHeaders: ['Content-Type', 'Authorization']
+}));
+
+// Configurar JSON parsing con límites
+app.use(express.json({ limit: '1mb' }));
+
+// Interfaces para TypeScript
 interface ComputeResponse {
   result: number;
   size: number;
   latency_ms: number;
 }
 
-// Interfaz para health check
 interface HealthResponse {
   status: string;
   service: string;
+  timestamp: string;
+}
+
+interface APIInfo {
+  message: string;
+  version: string;
+  features: string[];
+  endpoints: {
+    compute: string;
+    health: string;
+  };
+}
+
+// Función Fibonacci optimizada
+function fibonacci(n: number): number {
+  if (n <= 1) return n;
+  return fibonacci(n - 1) + fibonacci(n - 2);
 }
 
 /**
- * Calcula el n-ésimo número de Fibonacci de forma recursiva
- * @param n - El índice del número de Fibonacci a calcular
- * @returns El n-ésimo número de Fibonacci
+ * Endpoint principal de cálculo
  */
-function fib(n: number): number {
-  if (n < 2) {
-    return n;
-  }
-  return fib(n - 1) + fib(n - 2);
-}
-
-/**
- * Endpoint principal para calcular Fibonacci
- */
-app.get('/compute', (req: Request, res: Response) => {
+app.get('/compute', (_req, res) => {
   const startTime = Date.now();
   
-  // Obtener parámetro size de la query string
-  const sizeParam = req.query.size as string;
-  let size = 30; // valor por defecto
-  
-  if (sizeParam) {
-    const parsed = parseInt(sizeParam);
-    if (!isNaN(parsed) && parsed > 0 && parsed <= 50) {
-      size = parsed;
+  try {
+    // Obtener parámetro size con validación
+    const sizeParam = _req.query.size as string;
+    let size = 30; // valor por defecto
+    
+    if (sizeParam) {
+      const parsedSize = parseInt(sizeParam, 10);
+      if (!isNaN(parsedSize) && parsedSize >= 0 && parsedSize <= 50) {
+        size = parsedSize;
+      }
     }
+    
+    // Calcular Fibonacci
+    const result = fibonacci(size);
+    const totalLatency = Date.now() - startTime;
+    
+    const response: ComputeResponse = {
+      result,
+      size,
+      latency_ms: totalLatency
+    };
+    
+    res.json(response);
+    
+  } catch (error) {
+    console.error('Error in compute endpoint:', error);
+    res.status(500).json({ 
+      error: 'Internal server error',
+      message: error instanceof Error ? error.message : 'Unknown error'
+    });
   }
-  
-  // Calcular Fibonacci
-  const result = fib(size);
-  
-  // Calcular latencia
-  const latency_ms = Date.now() - startTime;
-  
-  // Crear respuesta
-  const response: ComputeResponse = {
-    result,
-    size,
-    latency_ms
-  };
-  
-  // Log de la petición
-  console.log(`Node.js API - Size: ${size}, Result: ${result}, Latency: ${latency_ms}ms`);
-  
-  // Enviar respuesta
-  res.json(response);
 });
 
 /**
  * Endpoint de health check
  */
-app.get('/health', (req: Request, res: Response) => {
+app.get('/health', (_req, res) => {
   const response: HealthResponse = {
     status: 'healthy',
-    service: 'node-api'
+    service: 'node-api',
+    timestamp: new Date().toISOString()
   };
   res.json(response);
 });
@@ -85,32 +101,48 @@ app.get('/health', (req: Request, res: Response) => {
 /**
  * Endpoint raíz con información de la API
  */
-app.get('/', (req: Request, res: Response) => {
-  res.json({
-    message: 'Node.js TypeScript Express API Benchmark',
-    version: '1.0.0',
+app.get('/', (_req, res) => {
+  const response: APIInfo = {
+    message: 'Node.js TypeScript Express API Benchmark - Optimized',
+    version: '2.0.0',
+    features: [
+      'High Performance Config',
+      'Optimized JSON Parsing',
+      'TypeScript',
+      'Express.js'
+    ],
     endpoints: {
       compute: '/compute?size=30',
       health: '/health'
     }
+  };
+  res.json(response);
+});
+
+// Manejador de errores global
+app.use((error: Error, _req: express.Request, res: express.Response, _next: express.NextFunction) => {
+  console.error('Unhandled error:', error);
+  res.status(500).json({ 
+    error: 'Internal server error',
+    message: error.message 
   });
 });
 
-// Iniciar servidor
-app.listen(PORT, () => {
-  console.log('🚀 Node.js TypeScript Express API iniciando...');
-  console.log(`📊 Endpoint: http://localhost:${PORT}/compute?size=30`);
-  console.log(`❤️  Health: http://localhost:${PORT}/health`);
-  console.log(`🌐 Server running on port ${PORT}`);
+// Configurar servidor con optimizaciones
+const server = app.listen(PORT, '0.0.0.0', () => {
+  console.log(`🚀 Node.js API optimizada escuchando en puerto ${PORT}`);
+  console.log(`📊 Configuración de alto rendimiento habilitada`);
 });
 
-// Manejo de errores no capturados
-process.on('uncaughtException', (error) => {
-  console.error('❌ Uncaught Exception:', error);
-  process.exit(1);
-});
+// Configuraciones de rendimiento para el servidor
+server.keepAliveTimeout = 65000; // Mayor que el load balancer típico
+server.headersTimeout = 66000;   // Ligeramente mayor que keepAliveTimeout
+server.maxConnections = 1000;    // Límite de conexiones
 
-process.on('unhandledRejection', (reason, promise) => {
-  console.error('❌ Unhandled Rejection at:', promise, 'reason:', reason);
-  process.exit(1);
+// Manejar shutdown graceful
+process.on('SIGTERM', () => {
+  console.log('Recibido SIGTERM, cerrando servidor...');
+  server.close(() => {
+    process.exit(0);
+  });
 }); 

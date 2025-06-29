@@ -7,8 +7,8 @@ WORKDIR /src
 # Copiar archivos de configuración
 COPY package*.json tsconfig.json ./
 
-# Instalar dependencias
-RUN npm ci --only=production && npm cache clean --force
+# Instalar todas las dependencias para build
+RUN npm install && npm cache clean --force
 
 # Copiar código fuente
 COPY src ./src
@@ -20,7 +20,7 @@ RUN npm run build
 FROM node:20-alpine
 
 # Instalar dependencias del sistema
-RUN apk add --no-cache dumb-init
+RUN apk add --no-cache dumb-init wget
 
 # Crear usuario no-root
 RUN addgroup -g 1001 -S appgroup && \
@@ -33,7 +33,7 @@ WORKDIR /app
 COPY package*.json ./
 
 # Instalar solo dependencias de producción
-RUN npm ci --only=production && npm cache clean --force
+RUN npm install --only=production && npm cache clean --force
 
 # Copiar archivos compilados
 COPY --from=build /src/dist ./dist
