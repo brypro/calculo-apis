@@ -15,7 +15,10 @@ import os
 from datetime import datetime
 
 # Configuración de matplotlib para mejor visualización
-plt.style.use('seaborn-v0_8')
+try:
+    plt.style.use('seaborn-v0_8')
+except:
+    plt.style.use('seaborn')
 sns.set_palette("husl")
 
 def load_benchmark_data(csv_path):
@@ -240,7 +243,8 @@ def create_mathematical_plots(results):
     plt.savefig(plot_filename, dpi=300, bbox_inches='tight')
     print(f"📊 Gráfica guardada: {plot_filename}")
     
-    plt.show()
+    # No mostrar la gráfica para evitar problemas en headless
+    # plt.show()
     
     return plot_filename
 
